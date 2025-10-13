@@ -92,22 +92,15 @@ const Refer = () => {
 
   const fetchReferralData = async () => {
     try {
+      // First, try to fetch the user's registration without the join to avoid complex query issues
       const { data: registration, error: registrationError } = await supabase
         .from("registrations")
-        .select(
-          `
-          referral_code,
-          id,
-          referred_by,
-          total_referrals,
-          referrer:registrations!referred_by(referral_code)
-        `
-        )
+        .select("referral_code, id, referred_by, total_referrals")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
-      if (registrationError && registrationError.code !== "PGRST116") {
-        // PGRST116 is "no rows returned"
+      if (registrationError) {
+        console.error("Registration query error:", registrationError);
         throw registrationError;
       }
 
@@ -118,32 +111,29 @@ const Refer = () => {
 
         console.log("Registration data:", registration);
         console.log("referred_by:", registration.referred_by);
-        console.log("referrer:", registration.referrer);
 
         // Set the current friend's referral code if it exists
         // Check if user has been referred by someone
         if (registration.referred_by) {
-          // If referrer data is available from the join
-          if (registration.referrer && registration.referrer.referral_code) {
-            console.log("Setting referral code from join:", registration.referrer.referral_code);
-            setCurrentFriendReferralCode(registration.referrer.referral_code);
-            setFriendReferralCode(registration.referrer.referral_code);
-          } else {
-            // Fallback: fetch referrer's code separately if join didn't work
-            console.log("Fetching referrer data separately for ID:", registration.referred_by);
-            const { data: referrerData } = await supabase
+          try {
+            // Fetch referrer's code separately to avoid join issues
+            console.log("Fetching referrer data for ID:", registration.referred_by);
+            const { data: referrerData, error: referrerError } = await supabase
               .from("registrations")
               .select("referral_code")
               .eq("id", registration.referred_by)
-              .single();
+              .maybeSingle();
             
-            console.log("Referrer data fetched:", referrerData);
-            
-            if (referrerData && referrerData.referral_code) {
-              console.log("Setting referral code from separate fetch:", referrerData.referral_code);
+            if (referrerError) {
+              console.error("Referrer query error:", referrerError);
+            } else if (referrerData && referrerData.referral_code) {
+              console.log("Setting referral code from referrer fetch:", referrerData.referral_code);
               setCurrentFriendReferralCode(referrerData.referral_code);
               setFriendReferralCode(referrerData.referral_code);
             }
+          } catch (referrerFetchError) {
+            console.error("Error fetching referrer data:", referrerFetchError);
+            // Don't throw here - just log the error and continue
           }
         } else {
           // Clear the states if no referral code is set
@@ -152,22 +142,32 @@ const Refer = () => {
           setFriendReferralCode("");
         }
 
-        const { data: referrals, error: referralsError } = await supabase
-          .from("registrations")
-          .select("fullName, email, created_at")
-          .eq("referred_by", registration.id);
+        // Fetch users referred by this registration
+        try {
+          const { data: referrals, error: referralsError } = await supabase
+            .from("registrations")
+            .select("fullName, email, created_at")
+            .eq("referred_by", registration.id);
 
-        if (referralsError) throw referralsError;
-
-        setReferredUsers(referrals || []);
+          if (referralsError) {
+            console.error("Referrals query error:", referralsError);
+          } else {
+            setReferredUsers(referrals || []);
+          }
+        } catch (referralsError) {
+          console.error("Error fetching referrals:", referralsError);
+          // Don't throw here - just log the error and continue
+          setReferredUsers([]);
+        }
       } else {
+        console.log("No registration found for user");
         setHasRegistration(false);
       }
     } catch (error) {
       console.error("Error fetching referral data:", error);
       toast({
         title: "Error",
-        description: "Failed to load referral data.",
+        description: `Failed to load referral data: ${error.message || "Unknown error"}`,
         variant: "destructive",
       });
     } finally {
@@ -185,20 +185,25 @@ const Refer = () => {
         .order("total_referrals", { ascending: false })
         .limit(10);
 
-      if (leaderboardError) throw leaderboardError;
+      if (leaderboardError) {
+        console.error("Leaderboard query error:", leaderboardError);
+        return; // Don't throw, just log and return
+      }
 
       // Transform data to match expected format
-      const formattedLeaderboard = leaderboardData.map((user) => ({
+      const formattedLeaderboard = (leaderboardData || []).map((user) => ({
         id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        institution: user.institution,
-        count: user.total_referrals,
+        fullName: user.fullName || 'Unknown',
+        email: user.email || 'Unknown',
+        institution: user.institution || 'Unknown',
+        count: user.total_referrals || 0,
       }));
 
       setLeaderboard(formattedLeaderboard);
     } catch (error) {
       console.error("Error fetching leaderboard:", error);
+      // Don't show error toast for leaderboard - it's not critical functionality
+      setLeaderboard([]);
     }
   };
 
