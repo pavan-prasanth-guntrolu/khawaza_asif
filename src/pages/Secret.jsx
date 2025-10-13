@@ -107,7 +107,7 @@ const PasswordGate = ({ onAuthenticate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4 mt-[90px]">
       <div className="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full">
         <h1 className="text-3xl font-bold text-white mb-6 text-center">
           🔐 Secret Dashboard
@@ -156,7 +156,7 @@ const DashboardHeader = ({
   ];
 
   return (
-    <div className="bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
+    <div className="bg-gray-800 rounded-lg shadow-lg p-6 mb-6 mt-[90px]">
       <h1 className="text-3xl font-bold text-white mb-6">
         📊 Qiskit Fall Fest Dashboard
       </h1>
