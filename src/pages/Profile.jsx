@@ -26,7 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/AuthProvider";
@@ -108,7 +107,7 @@ const indianStates = [
   "Puducherry",
 ];
 
-// ✅ Institute options (same as registration page)
+// Institute options
 const instituteOptions = [
   "RGUKT Srikakulam",
   "RGUKT Nuzvid",
@@ -171,7 +170,6 @@ const profileSchema = z
   })
   .refine(
     (data) => {
-      // If institution is "Others", customInstitution must be provided
       if (data.institution === "Others") {
         return data.customInstitution && data.customInstitution.trim() !== "";
       }
@@ -208,28 +206,6 @@ const Profile = () => {
   const watchedInstitution = watch("institution");
   const watchedAvatar = watch("avatar");
 
-  const [registerFormData, setRegisterFormData] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    institution: "",
-    year: "",
-    branch: "",
-    experience: "",
-    motivation: "",
-    referralCode: "",
-    attendanceMode: "",
-    agreeTerms: false,
-    agreeUpdates: false,
-    country: "",
-    state: "",
-    gender: "",
-  });
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isReferralCodeLocked, setIsReferralCodeLocked] = useState(false);
-
   useEffect(() => {
     if (!user) {
       navigate("/login");
@@ -247,10 +223,9 @@ const Profile = () => {
         if (error) throw error;
 
         if (data) {
-          // Manually map database fields to form fields
           setValue("fullName", data.fullName || "");
           setValue("email", data.email || "");
-          setValue("phone", data.phone ? data.phone.toString() : "");
+          setValue("phone", data.phone ? String(data.phone) : "");
           setValue("year", data.year || "");
           setValue("branch", data.branch || "");
           setValue("experience", data.experience || "");
@@ -258,23 +233,15 @@ const Profile = () => {
           setValue("country", data.country || "");
           setValue("state", data.state || "");
           setValue("gender", data.gender || "");
-
-          // Handle attendance_mode field mapping
           setValue("attendanceMode", data.attendance_mode || "");
-
-          // Handle avatar field mapping
           setValue("avatar", data.avatar || "");
 
-          // Handle institution mapping - if the institution is not in dropdown options, set it as custom
           if (data.institution) {
-            const institutionInOptions = instituteOptions.includes(
-              data.institution
-            );
-            if (institutionInOptions) {
+            const inOptions = instituteOptions.includes(data.institution);
+            if (inOptions) {
               setValue("institution", data.institution);
               setValue("customInstitution", "");
             } else {
-              // This is a custom institution
               setValue("institution", "Others");
               setValue("customInstitution", data.institution);
             }
@@ -283,16 +250,18 @@ const Profile = () => {
             setValue("customInstitution", "");
           }
 
-          // Store profile data for view mode
           setProfileData(data);
+        } else {
+          setProfileData(null);
         }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
+      } catch (err) {
+        console.error("Error fetching profile:", err);
         toast({
           title: "Error",
           description: "Failed to load profile data.",
           variant: "destructive",
         });
+        setProfileData(null);
       } finally {
         setLoading(false);
       }
@@ -300,19 +269,6 @@ const Profile = () => {
 
     fetchProfileData();
   }, [user, navigate, setValue, toast]);
-
-  useEffect(() => {
-    if (user?.email) {
-      setRegisterFormData((prev) => ({ ...prev, email: user.email }));
-    }
-  }, [user]);
-
-  useEffect(() => {
-    const ref = searchParams.get("ref");
-    if (ref && !isReferralCodeLocked) {
-      setRegisterFormData((prev) => ({ ...prev, referralCode: ref }));
-    }
-  }, [searchParams, isReferralCodeLocked]);
 
   const onSubmit = async (formData) => {
     setUpdating(true);
@@ -347,7 +303,6 @@ const Profile = () => {
         title: "Profile Updated",
         description: "Your profile has been successfully updated.",
       });
-      // Update profileData for view mode
       setProfileData({
         ...profileData,
         ...updateData,
@@ -358,121 +313,11 @@ const Profile = () => {
       toast({
         title: "Update Failed",
         description:
-          error.message || "Failed to update profile. Please try again.",
+          error?.message || "Failed to update profile. Please try again.",
         variant: "destructive",
       });
     } finally {
       setUpdating(false);
-    }
-  };
-
-  const handleRegisterInputChange = (field, value) => {
-    setRegisterFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const validateRegisterForm = () => {
-    const requiredFields = [
-      "fullName",
-      "email",
-      "phone",
-      "institution",
-      "year",
-      "branch",
-      "attendanceMode",
-      "country",
-      "gender",
-    ];
-    if (registerFormData.country === "India") requiredFields.push("state");
-
-    const missingFields = requiredFields.filter((f) => !registerFormData[f]);
-    if (missingFields.length > 0) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!registerFormData.agreeTerms) {
-      toast({
-        title: "Terms & Conditions",
-        description: "Please agree to the terms and conditions to continue.",
-        variant: "destructive",
-      });
-      return false;
-    }
-    return true;
-  };
-
-  const generateUniqueReferralCode = async () => {
-    while (true) {
-      const code = Math.random().toString(36).substring(2, 10).toUpperCase();
-      const { data, error } = await supabase
-        .from("registrations")
-        .select("id")
-        .eq("referral_code", code)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) return code;
-    }
-  };
-
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateRegisterForm()) return;
-    setIsSubmitting(true);
-    try {
-      if (!user) return;
-
-      const referralCode = await generateUniqueReferralCode();
-      let referredBy = null;
-      if (registerFormData.referralCode) {
-        const { data: referrer } = await supabase
-          .from("registrations")
-          .select("id")
-          .eq("referral_code", registerFormData.referralCode)
-          .single();
-        if (referrer) referredBy = referrer.id;
-      }
-
-      const { error } = await supabase.from("registrations").insert([
-        {
-          user_id: user.id,
-          fullName: registerFormData.fullName,
-          email: registerFormData.email,
-          phone: registerFormData.phone,
-          gender: registerFormData.gender,
-          institution: registerFormData.institution,
-          year: registerFormData.year,
-          branch: registerFormData.branch,
-          experience: registerFormData.experience,
-          motivation: registerFormData.motivation,
-          referral_code: referralCode,
-          referred_by: referredBy,
-          attendance_mode: registerFormData.attendanceMode,
-          country: registerFormData.country,
-          state: registerFormData.state,
-        },
-      ]);
-
-      if (error) throw error;
-
-      setIsSubmitted(true);
-      toast({
-        title: "Registration Successful!",
-        description: "You have registered for Qiskit Fall Fest 🎉",
-      });
-      // Refresh the page to load profile
-      window.location.reload();
-    } catch (err) {
-      console.error(err);
-      toast({
-        title: "Registration Failed",
-        description: err.message || "Try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -499,321 +344,43 @@ const Profile = () => {
     );
   }
 
+  // Not registered — show CTA to Register (no form here)
   if (!profileData) {
     return (
       <motion.div className="min-h-screen bg-background py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div className="max-w-2xl mx-auto">
-            <div className="text-center mb-12">
-              <h1 className="text-4xl font-bold mb-4">
-                Register for Qiskit Fall Fest 2025
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Secure your spot at IIIT Srikakulam's quantum computing
-                celebration
-              </p>
-            </div>
+          <motion.div
+            className="max-w-xl mx-auto"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
             <Card className="glass-card border border-white/10">
               <CardHeader>
                 <CardTitle className="text-2xl font-semibold">
-                  Registration Details
+                  Complete Your Registration
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleRegisterSubmit} className="space-y-6">
-                  {/* Personal Info */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="fullName">Full Name *</Label>
-                      <Input
-                        id="fullName"
-                        value={registerFormData.fullName}
-                        onChange={(e) =>
-                          handleRegisterInputChange("fullName", e.target.value)
-                        }
-                        placeholder="Enter your full name"
-                        required
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Note: This name will be considered for certificates.
-                      </p>
-                    </div>
-                    <div>
-                      <Label htmlFor="email">Email *</Label>
-                      <Input
-                        id="email"
-                        value={registerFormData.email}
-                        readOnly
-                        className="bg-muted cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone Number *</Label>
-                    <Input
-                      id="phone"
-                      value={registerFormData.phone}
-                      onChange={(e) =>
-                        handleRegisterInputChange("phone", e.target.value)
-                      }
-                      placeholder="+91 XXXXX XXXXX"
-                      required
-                    />
-                  </div>
-                  {/* Gender */}
-                  <div>
-                    <Label htmlFor="gender">Gender *</Label>
-                    <Select
-                      value={registerFormData.gender}
-                      onValueChange={(value) =>
-                        handleRegisterInputChange("gender", value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          value="Male"
-                          className="px-4 py-2 text-sm hover:bg-primary/10 rounded-md"
-                        >
-                          Male
-                        </SelectItem>
-                        <SelectItem
-                          value="Female"
-                          className="px-4 py-2 text-sm hover:bg-primary/10 rounded-md"
-                        >
-                          Female
-                        </SelectItem>
-                        <SelectItem
-                          value="Other"
-                          className="px-4 py-2 text-sm hover:bg-primary/10 rounded-md"
-                        >
-                          Other
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* Institution */}
-                  <div>
-                    <Label htmlFor="institution">Institution *</Label>
-                    <Input
-                      id="institution"
-                      value={registerFormData.institution}
-                      onChange={(e) =>
-                        handleRegisterInputChange("institution", e.target.value)
-                      }
-                      placeholder="Enter your institution"
-                      required
-                    />
-                  </div>
-                  {/* Year and Branch */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="year">Year *</Label>
-                      <Input
-                        id="year"
-                        value={registerFormData.year}
-                        onChange={(e) =>
-                          handleRegisterInputChange("year", e.target.value)
-                        }
-                        placeholder="e.g., 3rd Year, Final Year"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="branch">Branch *</Label>
-                      <Input
-                        id="branch"
-                        value={registerFormData.branch}
-                        onChange={(e) =>
-                          handleRegisterInputChange("branch", e.target.value)
-                        }
-                        placeholder="e.g., Computer Science"
-                        required
-                      />
-                    </div>
-                  </div>
-                  {/* Experience */}
-                  <div>
-                    <Label htmlFor="experience">Experience (Optional)</Label>
-                    <Textarea
-                      id="experience"
-                      value={registerFormData.experience}
-                      onChange={(e) =>
-                        handleRegisterInputChange("experience", e.target.value)
-                      }
-                      placeholder="Tell us about your experience in quantum computing or related fields"
-                      rows={3}
-                    />
-                  </div>
-                  {/* Motivation */}
-                  <div>
-                    <Label htmlFor="motivation">Motivation (Optional)</Label>
-                    <Textarea
-                      id="motivation"
-                      value={registerFormData.motivation}
-                      onChange={(e) =>
-                        handleRegisterInputChange("motivation", e.target.value)
-                      }
-                      placeholder="Why do you want to attend Qiskit Fall Fest?"
-                      rows={3}
-                    />
-                  </div>
-                  {/* Attendance Mode */}
-                  <div>
-                    <Label htmlFor="attendanceMode">Attendance Mode *</Label>
-                    <Select
-                      value={registerFormData.attendanceMode}
-                      onValueChange={(value) =>
-                        handleRegisterInputChange("attendanceMode", value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select attendance mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          value="in-person"
-                          className="px-4 py-2 text-sm hover:bg-primary/10 rounded-md"
-                        >
-                          In-Person
-                        </SelectItem>
-                        <SelectItem
-                          value="virtual"
-                          className="px-4 py-2 text-sm hover:bg-primary/10 rounded-md"
-                        >
-                          Virtual
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* Country and State */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="country">Country *</Label>
-                      <Select
-                        value={registerFormData.country}
-                        onValueChange={(value) =>
-                          handleRegisterInputChange("country", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select country" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {countries.map((country) => (
-                            <SelectItem
-                              key={country}
-                              value={country}
-                              className="px-4 py-2 text-sm hover:bg-primary/10 rounded-md"
-                            >
-                              {country}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {registerFormData.country === "India" && (
-                      <div>
-                        <Label htmlFor="state">State *</Label>
-                        <Select
-                          value={registerFormData.state}
-                          onValueChange={(value) =>
-                            handleRegisterInputChange("state", value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select state" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {indianStates.map((state) => (
-                              <SelectItem
-                                key={state}
-                                value={state}
-                                className="px-4 py-2 text-sm hover:bg-primary/10 rounded-md"
-                              >
-                                {state}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-                  {/* Referral Code */}
-                  <div>
-                    <Label htmlFor="referralCode">
-                      Referral Code (Optional)
-                    </Label>
-                    <Input
-                      id="referralCode"
-                      value={registerFormData.referralCode}
-                      onChange={(e) =>
-                        handleRegisterInputChange(
-                          "referralCode",
-                          e.target.value
-                        )
-                      }
-                      placeholder="Enter referral code if you have one"
-                      disabled={isReferralCodeLocked}
-                    />
-                  </div>
-                  {/* Terms and Updates */}
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="agreeTerms"
-                        checked={registerFormData.agreeTerms}
-                        onCheckedChange={(checked) =>
-                          handleRegisterInputChange("agreeTerms", checked)
-                        }
-                      />
-                      <Label htmlFor="agreeTerms" className="text-sm">
-                        I agree to the{" "}
-                        <a
-                          href="/code-of-conduct"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary underline"
-                        >
-                          Terms & Conditions
-                        </a>{" "}
-                        and{" "}
-                        <a
-                          href="/code-of-conduct"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary underline"
-                        >
-                          Code of Conduct
-                        </a>
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="agreeUpdates"
-                        checked={registerFormData.agreeUpdates}
-                        onCheckedChange={(checked) =>
-                          handleRegisterInputChange("agreeUpdates", checked)
-                        }
-                      />
-                      <Label htmlFor="agreeUpdates" className="text-sm">
-                        I agree to receive updates about the event
-                      </Label>
-                    </div>
-                  </div>
-                  {/* Submit Button */}
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground">
+                  We couldn’t find a registration for your account. Please
+                  register first to set up your profile and manage your details.
+                </p>
+                <div className="flex gap-3">
                   <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl shadow-lg hover:opacity-90 transition"
-                    disabled={isSubmitting}
+                    onClick={() => navigate("/register")}
+                    className="flex-1"
                   >
-                    {isSubmitting
-                      ? "Registering..."
-                      : "Register for Qiskit Fall Fest"}
+                    Go to Registration
                   </Button>
-                </form>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => navigate(-1)}
+                  >
+                    Go Back
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -822,6 +389,7 @@ const Profile = () => {
     );
   }
 
+  // Registered — show profile (and edit mode)
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -965,9 +533,8 @@ const Profile = () => {
                       <Select
                         onValueChange={(value) => {
                           field.onChange(value);
-                          if (value !== "Others") {
+                          if (value !== "Others")
                             setValue("customInstitution", "");
-                          }
                         }}
                         value={field.value}
                       >
@@ -990,7 +557,6 @@ const Profile = () => {
                     </p>
                   )}
 
-                  {/* Custom Institution Input - shown when Others is selected */}
                   {watchedInstitution === "Others" && (
                     <div className="mt-2">
                       <Input
@@ -1230,7 +796,6 @@ const Profile = () => {
                       </div>
                     )}
                   />
-                  {/* Avatar Preview */}
                   {watchedAvatar && (
                     <div className="flex items-center gap-3 p-3 bg-card/50 rounded-lg">
                       <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-quantum-cyan">
@@ -1330,7 +895,6 @@ const Profile = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Full Name */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground">
                         Full Name
@@ -1340,7 +904,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* Email */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <Mail className="h-4 w-4" />
@@ -1351,7 +914,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* Phone */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <Phone className="h-4 w-4" />
@@ -1362,7 +924,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* Gender */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground">
                         Gender
@@ -1372,7 +933,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* Institution */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <Building className="h-4 w-4" />
@@ -1383,7 +943,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* Year */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <GraduationCap className="h-4 w-4" />
@@ -1394,7 +953,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* Branch */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground">
                         Branch/Specialization
@@ -1404,7 +962,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* Attendance Mode */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground">
                         Preferred Attendance Mode
@@ -1414,7 +971,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* Country */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
@@ -1425,7 +981,6 @@ const Profile = () => {
                       </p>
                     </div>
 
-                    {/* State (only for India) */}
                     {profileData.country === "India" && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-muted-foreground">
@@ -1438,7 +993,6 @@ const Profile = () => {
                     )}
                   </div>
 
-                  {/* Experience */}
                   {profileData.experience && (
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground">
@@ -1450,7 +1004,6 @@ const Profile = () => {
                     </div>
                   )}
 
-                  {/* Motivation */}
                   {profileData.motivation && (
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground">
