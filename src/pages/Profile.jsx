@@ -33,6 +33,9 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
+// ---- helpers ----
+const onlyDigits10 = (v) => (v || "").replace(/\D/g, "").slice(0, 10);
+
 // Countries list
 const countries = [
   "India",
@@ -150,12 +153,15 @@ const availableAvatars = [
   },
 ];
 
-// Validation schema
+// Validation schema (phone must be exactly 10 digits)
 const profileSchema = z
   .object({
     fullName: z.string().min(1, "Full name is required"),
     email: z.string().email("Invalid email address"),
-    phone: z.string().min(1, "Phone number is required"),
+    phone: z
+      .string()
+      .min(1, "Phone number is required")
+      .regex(/^\d{10}$/, "Enter exactly 10 digits (0–9)"),
     institution: z.string().min(1, "Institution is required"),
     customInstitution: z.string().optional(),
     year: z.string().min(1, "Year is required"),
@@ -225,7 +231,8 @@ const Profile = () => {
         if (data) {
           setValue("fullName", data.fullName || "");
           setValue("email", data.email || "");
-          setValue("phone", data.phone ? String(data.phone) : "");
+          // sanitize to 10 digits on load
+          setValue("phone", data.phone ? onlyDigits10(String(data.phone)) : "");
           setValue("year", data.year || "");
           setValue("branch", data.branch || "");
           setValue("experience", data.experience || "");
@@ -276,6 +283,7 @@ const Profile = () => {
       const updateData = {
         fullName: formData.fullName,
         email: formData.email,
+        // store as integer; schema already ensures 10 digits
         phone: formData.phone ? parseInt(formData.phone, 10) : null,
         institution:
           formData.institution === "Others"
@@ -470,17 +478,64 @@ const Profile = () => {
                   )}
                 </div>
 
-                {/* Phone */}
+                {/* Phone (digits-only, max 10) */}
                 <div className="space-y-2">
                   <Label htmlFor="phone" className="flex items-center gap-2">
                     <Phone className="h-4 w-4" />
                     Phone Number *
                   </Label>
+
                   <Input
                     id="phone"
-                    {...register("phone")}
-                    placeholder="Enter your phone number"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    maxLength={10}
+                    placeholder="10-digit mobile number"
+                    {...register("phone", {
+                      onChange: (e) => {
+                        const clean = onlyDigits10(e.target.value);
+                        setValue("phone", clean, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      },
+                    })}
+                    onKeyDown={(e) => {
+                      // allow control/navigation keys
+                      const allowedKeys = [
+                        "Backspace",
+                        "Delete",
+                        "Tab",
+                        "ArrowLeft",
+                        "ArrowRight",
+                        "Home",
+                        "End",
+                      ];
+                      if (allowedKeys.includes(e.key)) return;
+
+                      // block anything that isn't 0–9
+                      if (!/^\d$/.test(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pasted =
+                        (e.clipboardData || window.clipboardData).getData(
+                          "text"
+                        ) || "";
+                      const clean = onlyDigits10(pasted);
+                      setValue("phone", clean, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                    }}
+                    onDrop={(e) => {
+                      // prevent dropping text with spaces/symbols
+                      e.preventDefault();
+                    }}
                   />
+
                   {errors.phone && (
                     <p className="text-sm text-red-500">
                       {errors.phone.message}
@@ -711,7 +766,7 @@ const Profile = () => {
                           <SelectValue placeholder="Select attendance mode" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="virtual">Vitual</SelectItem>
+                          <SelectItem value="virtual">Virtual</SelectItem>
                           <SelectItem value="in-person">In-Person</SelectItem>
                         </SelectContent>
                       </Select>
