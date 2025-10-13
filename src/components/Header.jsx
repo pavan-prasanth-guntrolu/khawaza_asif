@@ -114,23 +114,30 @@ export default function Header() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logos */}
-          <a
-            href="https://www.rgukt.in"
-            className="flex items-center space-x-2"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="RGUKT official website"
-          >
-            <img src={RguktLogo} alt="RGUKT logo" className="h-10 w-auto" />
-          </a>
-
           <div className="flex items-center gap-2">
-            <img
-              src={NewLogo}
-              alt="Qiskit Fall Fest logo"
-              className="h-10 w-auto"
-            />
-            <span className="text-lg font-bold">Qiskit Fall Fest '25</span>
+            <a
+              href="https://www.rgukt.in"
+              className="flex items-center space-x-2"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="RGUKT official website"
+            >
+              <img src={RguktLogo} alt="RGUKT logo" className="h-10 w-auto" />
+            </a>
+            <a
+              href="/"
+              className="flex items-center space-x-2"
+              rel="noopener noreferrer"
+              aria-label="RGUKT official website"
+            >
+              <img
+                src={NewLogo}
+                alt="Qiskit Fall Fest logo"
+                className="h-10 w-auto"
+              />
+
+              <span className="text-lg font-bold">Qiskit Fall Fest '25</span>
+            </a>
           </div>
 
           {/* Desktop Navigation */}
