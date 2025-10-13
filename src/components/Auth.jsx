@@ -248,10 +248,10 @@ const AuthComponent = () => {
               <span className="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-20 transition-opacity"></span>{" "}
             </Button>{" "}
           </form>{" "}
-          <div className="mt-6 flex items-center">
-            <Separator className="flex-grow" />{" "}
-            <span className="px-3 text-xs text-muted-foreground">OR</span>
-            <Separator className="flex-grow" />{" "}
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Separator className="flex-grow" />
+            <span className="text-xs text-muted-foreground">OR</span>
+            <Separator className="flex-grow" />
           </div>{" "}
           <Button
             type="button"
