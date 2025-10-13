@@ -318,7 +318,6 @@ const Register = () => {
       )}&name=${encodeURIComponent(
         formData.fullName || "User"
       )}&otp=${otpCode}`;
-      alert(otpCode);
       const response = await fetch(apiUrl, {
         method: "GET",
         mode: "no-cors",
@@ -330,7 +329,7 @@ const Register = () => {
       sessionStorage.setItem("otp_timestamp", Date.now().toString());
 
       setIsOtpSent(true);
-      setOtpTimer(0); // 60 seconds countdown
+      setOtpTimer(60); // 60 seconds countdown
       toast({
         title: "OTP Sent!",
         description: "Please check your email for the verification code.",
