@@ -131,6 +131,9 @@ const instituteOptions = [
   "Others",
 ];
 
+// ✅ Phone sanitizer: only digits, max 10
+const sanitizePhone = (value) => value.replace(/\D/g, "").slice(0, 10);
+
 const Register = () => {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -274,6 +277,19 @@ const Register = () => {
       });
       return false;
     }
+
+    // ✅ Phone must be exactly 10 digits
+    const phoneDigits = (formData.phone || "").replace(/\D/g, "");
+    if (phoneDigits.length !== 10) {
+      toast({
+        title: "Invalid Phone Number",
+        description:
+          "Please enter a valid 10-digit phone number (digits only).",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     if (!formData.agreeTerms) {
       toast({
         title: "Terms & Conditions",
@@ -318,7 +334,7 @@ const Register = () => {
       )}&name=${encodeURIComponent(
         formData.fullName || "User"
       )}&otp=${otpCode}`;
-      const response = await fetch(apiUrl, {
+      await fetch(apiUrl, {
         method: "GET",
         mode: "no-cors",
       });
@@ -404,13 +420,16 @@ const Register = () => {
         if (referrer) referredBy = referrer.id;
       }
 
+      // ✅ Ensure only digits go to DB
+      const phoneDigits = sanitizePhone(formData.phone || "");
+
       // Insert into Supabase
       const { error } = await supabase.from("registrations").insert([
         {
           user_id: user.id,
           fullName: formData.fullName,
           email: formData.email,
-          phone: formData.phone,
+          phone: phoneDigits, // ✅ sanitized
           gender: formData.gender,
           institution:
             formData.institution === "Others"
@@ -521,7 +540,7 @@ const Register = () => {
   if (alreadyRegistered || isSubmitted) {
     return (
       <motion.div
-        className="min-h-screen flex items-center justify-center bg-background px-4"
+        className="min-h-screen flex items-center justify-center bg-background px-4 mt-[90px]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
@@ -810,9 +829,29 @@ const Register = () => {
                           id="phone"
                           value={formData.phone}
                           onChange={(e) =>
-                            handleInputChange("phone", e.target.value)
+                            handleInputChange(
+                              "phone",
+                              sanitizePhone(e.target.value)
+                            )
                           }
-                          placeholder="+91 XXXXX XXXXX"
+                          onKeyDown={(e) => {
+                            // Block space key from soft keyboards
+                            if (e.key === " ") e.preventDefault();
+                          }}
+                          onPaste={(e) => {
+                            // Clean pasted content
+                            e.preventDefault();
+                            const pasted = (
+                              e.clipboardData || window.clipboardData
+                            ).getData("text");
+                            handleInputChange("phone", sanitizePhone(pasted));
+                          }}
+                          inputMode="numeric" // nudges mobile keyboards to numeric
+                          type="tel" // phone-friendly, still flexible
+                          pattern="\d{10}" // HTML validation: exactly 10 digits
+                          maxLength={10} // hard cap in the UI
+                          autoComplete="tel"
+                          placeholder="10-digit number"
                           required
                         />
                       </div>
