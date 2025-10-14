@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Download, Search, ChevronUp, ChevronDown, Filter } from "lucide-react";
 
-const ALLOWED_EMAILS = ["you", "dreambig"];
+const ALLOWED_EMAILS = ["guess it", "pop", "admin@11"];
 
 const TABLES = {
   accommodation: "Accommodation",
@@ -255,7 +255,7 @@ const AdminDashboard = () => {
                 Enter Acess Code
               </label>
               <input
-                type="email"
+                type="password"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleEmailSubmit()}

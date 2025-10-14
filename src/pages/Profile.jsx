@@ -854,17 +854,51 @@ const Profile = () => {
                   {watchedAvatar && (
                     <div className="flex items-center gap-3 p-3 bg-card/50 rounded-lg">
                       <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-quantum-cyan">
-                        <img
-                          src={
-                            availableAvatars.find((a) => a.id === watchedAvatar)
-                              ?.src
+                        {(() => {
+                          const meta = availableAvatars.find(
+                            (a) => a.id === watchedAvatar
+                          );
+                          if (meta?.src) {
+                            return (
+                              <img
+                                src={meta.src}
+                                alt="Selected avatar preview"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            );
                           }
-                          alt="Selected avatar preview"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.src = "/images/default-avatar.svg";
-                          }}
-                        />
+                          const source = (
+                            watch("fullName") ||
+                            watch("email") ||
+                            "User"
+                          ).trim();
+                          const base = source.includes("@")
+                            ? source.split("@")[0]
+                            : source;
+                          const parts = base
+                            .replace(/[_\-.]+/g, " ")
+                            .split(" ")
+                            .filter(Boolean);
+                          const initials = (
+                            (parts[0]?.[0] || "") +
+                              (parts.length > 1
+                                ? parts[parts.length - 1][0]
+                                : "") ||
+                            parts[0]?.slice(0, 2) ||
+                            "U"
+                          ).toUpperCase();
+
+                          return (
+                            <div className="w-full h-full bg-primary text-white flex items-center justify-center">
+                              <span className="text-sm font-semibold">
+                                {initials}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div>
                         <p className="text-sm font-medium">Selected Avatar</p>
@@ -914,27 +948,53 @@ const Profile = () => {
                   {/* Avatar Display */}
                   <div className="flex items-center gap-4 p-4 bg-card/50 rounded-xl">
                     <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-quantum-cyan">
-                      {profileData.avatar ? (
-                        <img
-                          src={
-                            availableAvatars.find(
-                              (a) => a.id === profileData.avatar
-                            )?.src
-                          }
-                          alt="Profile avatar"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.src = "/images/default-avatar.svg";
-                          }}
-                        />
-                      ) : (
-                        <img
-                          src="/images/default-avatar.svg"
-                          alt="Default avatar"
-                          className="w-full h-full object-cover"
-                        />
-                      )}
+                      {(() => {
+                        const meta = availableAvatars.find(
+                          (a) => a.id === profileData.avatar
+                        );
+                        if (meta?.src) {
+                          return (
+                            <img
+                              src={meta.src}
+                              alt="Profile avatar"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          );
+                        }
+                        const source = (
+                          profileData.fullName ||
+                          profileData.email ||
+                          "User"
+                        ).trim();
+                        const base = source.includes("@")
+                          ? source.split("@")[0]
+                          : source;
+                        const parts = base
+                          .replace(/[_\-.]+/g, " ")
+                          .split(" ")
+                          .filter(Boolean);
+                        const initials = (
+                          (parts[0]?.[0] || "") +
+                            (parts.length > 1
+                              ? parts[parts.length - 1][0]
+                              : "") ||
+                          parts[0]?.slice(0, 2) ||
+                          "U"
+                        ).toUpperCase();
+
+                        return (
+                          <div className="w-full h-full bg-primary text-white flex items-center justify-center">
+                            <span className="text-lg font-semibold">
+                              {initials}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
+
                     <div>
                       <h3 className="text-xl font-bold">
                         {profileData.fullName}

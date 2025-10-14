@@ -67,7 +67,12 @@ const Sponsors = () => {
                       whileInView={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.1 }}
                     >
-                      <a href={sponsor.website} target="_blank" rel="noopener noreferrer" className="block">
+                      <a
+                        href={sponsor.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                      >
                         <Card className="glass-card border border-white/10 h-full hover:border-primary/50 transition-colors">
                           <CardContent className="p-6 text-center">
                             <div className="h-16 flex items-center justify-center mb-4 bg-white rounded-lg">
@@ -75,7 +80,9 @@ const Sponsors = () => {
                                 <img src={sponsor.logo} alt="" />
                               </span>
                             </div>
-                            <h3 className="font-semibold mb-2">{sponsor.name}</h3>
+                            <h3 className="font-semibold mb-2">
+                              {sponsor.name}
+                            </h3>
                             <p className="text-muted-foreground text-sm">
                               {sponsor.description}
                             </p>
@@ -113,9 +120,14 @@ const Sponsors = () => {
                       Exclusive Partnership Opportunity
                     </div>
                     <div>
-                      <h2 className="text-3xl lg:text-4xl font-bold mb-4">Become a Sponsor</h2>
+                      <h2 className="text-3xl lg:text-4xl font-bold mb-4">
+                        Become a Sponsor
+                      </h2>
                       <p className="text-muted-foreground leading-relaxed">
-                        Support Qiskit Fall Fest 2025 and align your brand with the brightest minds in the quantum ecosystem. Amplify your impact among 23,000+ students, researchers, and industry leaders.
+                        Support Qiskit Fall Fest 2025 and align your brand with
+                        the brightest minds in the quantum ecosystem. Amplify
+                        your impact among 23,000+ students, researchers, and
+                        industry leaders.
                       </p>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-3">
@@ -125,7 +137,8 @@ const Sponsors = () => {
                           Audience Reach
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          Engage with a curated community of passionate innovators and technologists.
+                          Engage with a curated community of passionate
+                          innovators and technologists.
                         </p>
                       </div>
                       <div className="p-4 rounded-xl bg-background/80 border border-white/10 shadow-sm">
@@ -134,7 +147,8 @@ const Sponsors = () => {
                           Brand Elevation
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          Showcase your commitment to the future of quantum technology and education.
+                          Showcase your commitment to the future of quantum
+                          technology and education.
                         </p>
                       </div>
                       <div className="p-4 rounded-xl bg-background/80 border border-white/10 shadow-sm">
@@ -143,7 +157,8 @@ const Sponsors = () => {
                           Custom Experiences
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          Tailored sponsorship tiers to maximize your engagement and visibility.
+                          Tailored sponsorship tiers to maximize your engagement
+                          and visibility.
                         </p>
                       </div>
                     </div>
@@ -158,22 +173,33 @@ const Sponsors = () => {
                   >
                     <div className="p-6 rounded-2xl bg-background/80 border border-primary/20 shadow-xl">
                       <p className="text-muted-foreground text-sm mb-4">
-                        Download our detailed sponsor brochure to explore benefits, tiers, and customized collaboration options.
+                        Download our detailed sponsor brochure to explore
+                        benefits, tiers, and customized collaboration options.
                       </p>
                       <div className="grid gap-3">
                         <Button
                           asChild
                           size="lg"
-                          className="btn-quantum h-14 text-base font-semibold rounded-full shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all"
+                          className="
+    btn-quantum h-14 text-base font-semibold rounded-full
+    shadow-lg shadow-primary/30 hover:shadow-primary/50
+    transition-all
+    relative overflow-hidden
+    text-white hover:text-white
+  "
                         >
                           <Link
                             to="/sponsorship-form"
                             className="flex items-center justify-center gap-2"
                           >
-                            Apply to Become a Sponsor
-                            <ArrowRight className="h-5 w-5" />
+                            {/* Keep content above any ::before overlays */}
+                            <span className="relative z-10 flex items-center gap-2">
+                              Apply to Become a Sponsor
+                              <ArrowRight className="h-5 w-5" />
+                            </span>
                           </Link>
                         </Button>
+
                         <Button
                           variant="outline"
                           size="lg"

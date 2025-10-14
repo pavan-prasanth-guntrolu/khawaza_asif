@@ -86,13 +86,37 @@ const getRGUKTCampus = (institution) => {
   return null;
 };
 
+// ---- Time helpers (IST) ----
+const IST_TZ = "Asia/Kolkata";
+const toISTParts = (isoString) => {
+  const d = new Date(isoString);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  const yyyy = get("year");
+  const mm = get("month");
+  const dd = get("day");
+  const hr = parseInt(get("hour"), 10);
+  return { date: `${yyyy}-${mm}-${dd}`, hour: hr };
+};
+
 // Password Gate Component
 const PasswordGate = ({ onAuthenticate }) => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = () => {
-    if (password === "dreambig" || password === "you") {
+    if (
+      password === "guess it" ||
+      password === "pop" ||
+      password === "admin@11"
+    ) {
       onAuthenticate();
     } else {
       setError("Invalid password");
@@ -153,6 +177,7 @@ const DashboardHeader = ({
     "Referral Insights",
     "Institution Comparison",
     "Time Trends",
+    "Day-wise (Hourly)", // NEW
   ];
 
   return (
@@ -647,7 +672,13 @@ const ReferralTable = ({ topReferrers }) => {
 };
 
 // Export Button Component
-const ExportButton = ({ selectedView, stats, registrations }) => {
+const ExportButton = ({
+  selectedView,
+  stats,
+  registrations,
+  selectedDay,
+  getHourlyCountsForDay,
+}) => {
   const handleExport = () => {
     let dataToExport = [];
     let filename = "";
@@ -815,6 +846,20 @@ const ExportButton = ({ selectedView, stats, registrations }) => {
         filename = "time_trends";
         break;
 
+      case "Day-wise (Hourly)":
+        if (selectedDay && getHourlyCountsForDay) {
+          const { hours, counts } = getHourlyCountsForDay(selectedDay);
+          dataToExport = hours.map((h, i) => ({
+            Hour: `${String(h).padStart(2, "0")}:00`,
+            Registrations: counts[i],
+          }));
+          filename = `hourly_${selectedDay}`;
+        } else {
+          dataToExport = [];
+          filename = "hourly";
+        }
+        break;
+
       default:
         dataToExport = registrations;
         filename = "all_registrations";
@@ -842,6 +887,152 @@ const ExportButton = ({ selectedView, stats, registrations }) => {
   );
 };
 
+// ---- Day-wise (Hourly) View ----
+const DayHourlyView = ({
+  selectedDay,
+  setSelectedDay,
+  getHourlyCountsForDay,
+}) => {
+  const { hours, counts } = getHourlyCountsForDay(selectedDay || "");
+
+  const labels = hours.map((h) => `${String(h).padStart(2, "0")}:00`);
+  const total = counts.reduce((a, b) => a + b, 0);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: "#fff" } },
+      title: {
+        display: true,
+        text: `Hourly registrations for ${selectedDay} (IST)`,
+        color: "#fff",
+        font: { size: 18 },
+      },
+      tooltip: { mode: "index", intersect: false },
+    },
+    scales: {
+      x: { ticks: { color: "#fff" }, grid: { color: "rgba(255,255,255,0.1)" } },
+      y: {
+        ticks: { color: "#fff" },
+        grid: { color: "rgba(255,255,255,0.1)" },
+        beginAtZero: true,
+        suggestedMax: Math.max(5, ...counts),
+      },
+    },
+  };
+
+  const exportCSV = () => {
+    const rows = labels.map((label, i) => ({
+      Hour: label,
+      Registrations: counts[i],
+    }));
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `hourly_${selectedDay}.csv`;
+    link.click();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-gray-800 rounded-lg shadow-lg p-6">
+        <div className="flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-white mb-2">
+              🕒 Day-wise Hourly Projection (IST)
+            </h3>
+            <p className="text-gray-400 text-sm">
+              Pick a day to see per-hour registrations.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div>
+              <label className="text-gray-300 text-sm mb-2 block">
+                Select Day
+              </label>
+              <input
+                type="date"
+                value={selectedDay || ""}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={exportCSV}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold"
+            >
+              📥 Export CSV
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 h-96">
+          <Line
+            data={{
+              labels,
+              datasets: [
+                {
+                  label: "Registrations",
+                  data: counts,
+                  borderColor: "#22d3ee",
+                  backgroundColor: "rgba(34, 211, 238, 0.15)",
+                  tension: 0.3,
+                },
+              ],
+            }}
+            options={chartOptions}
+          />
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg shadow-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-lg font-semibold">📋 Hourly Breakdown</h4>
+          <span className="text-sm text-gray-300">
+            Total: <span className="text-white font-bold">{total}</span>
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-700">
+                <th className="text-left text-gray-300 py-3 px-4">
+                  Hour (IST)
+                </th>
+                <th className="text-right text-gray-300 py-3 px-4">
+                  Registrations
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {labels.map((label, i) => (
+                <tr
+                  key={label}
+                  className="border-b border-gray-700 hover:bg-gray-700 transition-colors"
+                >
+                  <td className="py-3 px-4 text-white">{label}</td>
+                  <td className="py-3 px-4 text-right text-white">
+                    {counts[i]}
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td className="py-3 px-4 text-white font-semibold">Total</td>
+                <td className="py-3 px-4 text-right text-white font-bold">
+                  {total}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main Dashboard Component
 const SecretDashboard = () => {
   const [authenticated, setAuthenticated] = useState(false);
@@ -850,6 +1041,7 @@ const SecretDashboard = () => {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [registrations, setRegistrations] = useState([]);
+  const [selectedDay, setSelectedDay] = useState(null); // NEW
   const [stats, setStats] = useState({
     totalRegistrations: 0,
     inPersonCount: 0,
@@ -907,6 +1099,23 @@ const SecretDashboard = () => {
       setRegistrations(allRegistrations);
       computeStats(allRegistrations);
       setLastUpdated(new Date());
+
+      // pick default selected day as latest day with data (IST)
+      const trendDates = Object.keys(
+        allRegistrations.reduce((acc, r) => {
+          if (r.created_at) {
+            const { date } = toISTParts(r.created_at);
+            acc[date] = (acc[date] || 0) + 1;
+          }
+          return acc;
+        }, {})
+      );
+      if (trendDates.length) {
+        const latest = trendDates
+          .sort((a, b) => new Date(a) - new Date(b))
+          .pop();
+        setSelectedDay((prev) => prev ?? latest);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -1052,7 +1261,7 @@ const SecretDashboard = () => {
           (stats.stateDistribution[reg.state] || 0) + 1;
       }
 
-      // Time trends
+      // Time trends (UTC-based daily; fine for high-level trend)
       if (reg.created_at) {
         const date = new Date(reg.created_at).toISOString().split("T")[0];
         stats.timeTrends[date] = (stats.timeTrends[date] || 0) + 1;
@@ -1085,7 +1294,23 @@ const SecretDashboard = () => {
     setStats(stats);
   };
 
-  // Auto-refresh effect
+  // Compute hourly data for a day (IST)
+  const getHourlyCountsForDay = (dayYYYYMMDD) => {
+    const hours = Array.from({ length: 24 }, (_, h) => h);
+    const counts = Array(24).fill(0);
+
+    registrations.forEach((r) => {
+      if (!r.created_at) return;
+      const { date, hour } = toISTParts(r.created_at);
+      if (date === dayYYYYMMDD && hour >= 0 && hour <= 23) {
+        counts[hour]++;
+      }
+    });
+
+    return { hours, counts };
+  };
+
+  // Auto-refresh + initial load
   useEffect(() => {
     if (authenticated) {
       fetchData();
@@ -1133,6 +1358,12 @@ const SecretDashboard = () => {
                 </div>
                 <ReferralTable topReferrers={stats.topReferrers} />
               </div>
+            ) : selectedView === "Day-wise (Hourly)" ? (
+              <DayHourlyView
+                selectedDay={selectedDay}
+                setSelectedDay={setSelectedDay}
+                getHourlyCountsForDay={getHourlyCountsForDay}
+              />
             ) : (
               selectedView !== "Overview" && (
                 <ViewSection view={selectedView} stats={stats} />
@@ -1144,6 +1375,8 @@ const SecretDashboard = () => {
                 selectedView={selectedView}
                 stats={stats}
                 registrations={registrations}
+                selectedDay={selectedDay} // NEW
+                getHourlyCountsForDay={getHourlyCountsForDay} // NEW
               />
             </div>
           </>

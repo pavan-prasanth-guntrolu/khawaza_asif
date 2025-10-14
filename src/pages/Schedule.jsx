@@ -8,7 +8,7 @@ import {
   Star,
   Layers,
 } from "lucide-react";
-import scheduleData from "../data/schedule.json";
+import scheduleData from "../data/schedule copy.json";
 
 const Schedule = () => {
   const getSessionIcon = (type) => {
@@ -68,14 +68,14 @@ const Schedule = () => {
                   {session.location}
                 </span>
               )}
-              {session.speakers && (
+              {/* {session.speakers && (
                 <span className="flex items-center gap-2">
                   <User className="w-4 h-4 text-green-300" />
                   {Array.isArray(session.speakers)
                     ? session.speakers.join(", ")
                     : session.speakers}
                 </span>
-              )}
+              )} */}
             </div>
 
             {/* 🔽 Extra Info Section with Badges */}

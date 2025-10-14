@@ -41,12 +41,12 @@ import {
   getReferralCode,
   clearStoredReferralCode,
 } from "@/lib/referralCodeUtils";
-import groupQR from "/images/newwhat.png";
+import groupQR from "/images/group-4.jpg";
 import secondQR from "/images/second-qr.jpg";
 
 // ✅ WhatsApp link
 const WHATSAPP_GROUP_LINK =
-  "https://chat.whatsapp.com/HXO9g8FNyx9F7kuQy3Uajy?mode=ems_qr_t";
+  "https://chat.whatsapp.com/CQGYsUS07JEAwyfIzGG9Eg?mode=ems_qr_t";
 
 // ✅ All countries list
 const countries = [
@@ -626,12 +626,20 @@ const Register = () => {
           >
             <Button
               onClick={() => window.open(WHATSAPP_GROUP_LINK, "_blank")}
-              className="btn-quantum px-8 py-3 text-base font-semibold rounded-xl shadow-lg group transition-all duration-300 hover:scale-105"
+              className="
+    btn-quantum px-8 py-3 text-base font-semibold rounded-xl
+    shadow-lg group transition-all duration-300 hover:scale-105
+    relative overflow-hidden
+    text-white hover:text-white
+  "
             >
-              <Users className="h-5 w-5 mr-2" />
-              Join WhatsApp Community
-              <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-1" />
+              <span className="relative z-10 flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Join WhatsApp Community
+                <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-1" />
+              </span>
             </Button>
+
             <Button
               onClick={() => navigate("/refer")}
               variant="outline"
@@ -1207,14 +1215,29 @@ const Register = () => {
                     )}
 
                     <div className="text-center">
-                      <a
-                        href={WHATSAPP_GROUP_LINK}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline text-sm"
+                      <Button
+                        onClick={() =>
+                          window.open(WHATSAPP_GROUP_LINK, "_blank")
+                        }
+                        className="
+    group relative isolate overflow-hidden
+    px-8 py-3 text-base font-semibold rounded-xl
+    shadow-lg transition-all duration-300 hover:scale-105
+    bg-[#0F131A] text-white
+  "
                       >
-                        Join WhatsApp Community
-                      </a>
+                        {/* gradient background layer */}
+                        <span
+                          className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity
+                   bg-gradient-to-r from-quantum-blue to-quantum-purple"
+                        />
+                        {/* content stays above */}
+                        <span className="relative z-10 flex items-center">
+                          <Users className="h-5 w-5 mr-2" />
+                          Join WhatsApp Community
+                          <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-1" />
+                        </span>
+                      </Button>
                     </div>
                   </div>
                 </form>
