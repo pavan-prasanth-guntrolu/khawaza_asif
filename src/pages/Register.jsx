@@ -1,25 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   CheckCircle,
   User,
-  Mail,
-  Phone,
-  GraduationCap,
-  Building,
   Lock,
-  Shield,
   AlertCircle,
   Users,
-  Globe,
-  MapPin,
-  BookOpen,
-  Heart,
-  Sparkles,
   ArrowRight,
-  ChevronDown,
-  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/AuthProvider";
@@ -41,6 +29,17 @@ import {
   getReferralCode,
   clearStoredReferralCode,
 } from "@/lib/referralCodeUtils";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import groupQR from "/images/group-4.jpg";
 import secondQR from "/images/second-qr.jpg";
 
@@ -131,8 +130,192 @@ const instituteOptions = [
   "Others",
 ];
 
-// ✅ Phone sanitizer: only digits, max 10
+// ✅ Phone sanitizer
 const sanitizePhone = (value) => value.replace(/\D/g, "").slice(0, 10);
+
+// 🔧 helpers
+const normalize = (s = "") => s.trim().replace(/\s+/g, " ");
+
+// --- Free-text input with suggestions; type-to-jump only on the FIRST typed character ---
+function ApprovedInstitutionInput({
+  value,
+  onChange,
+  placeholder = "Enter your institution",
+  disabled = false,
+}) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [institutions, setInstitutions] = useState([]); // flat, sorted list
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+  const itemRefs = useRef([]);
+  const listRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("ambassador_applications")
+          .select("institution, status")
+          .eq("status", "approved");
+        if (error) throw error;
+
+        const seen = new Map(); // case-insensitive dedupe
+        (data || []).forEach((row) => {
+          const raw = row?.institution || "";
+          const cleaned = normalize(raw);
+          const key = cleaned.toLowerCase();
+          if (cleaned && !seen.has(key)) seen.set(key, cleaned);
+        });
+
+        const list = Array.from(seen.values()).sort((a, b) =>
+          a.localeCompare(b)
+        );
+        if (isMounted) setInstitutions(list);
+      } catch (err) {
+        console.error("Failed to load institutions:", err);
+        toast({
+          title: "Couldn’t load institutions",
+          description: "Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [toast]);
+
+  const handleFocus = () => {
+    setOpen(true);
+    const idx = value
+      ? institutions.findIndex((n) => n.toLowerCase() === value.toLowerCase())
+      : -1;
+    setHighlightedIndex(idx);
+  };
+
+  const handleBlur = () => {
+    // Delay closing so click/enter can register
+    setTimeout(() => setOpen(false), 120);
+  };
+
+  const scrollToIndex = (i) => {
+    const el = itemRefs.current[i];
+    if (el?.scrollIntoView) el.scrollIntoView({ block: "nearest" });
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "Enter") {
+      if (highlightedIndex >= 0 && highlightedIndex < institutions.length) {
+        onChange(institutions[highlightedIndex]); // pick highlighted
+        setOpen(false);
+      }
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      const next = Math.min(highlightedIndex + 1, institutions.length - 1);
+      setHighlightedIndex(next);
+      scrollToIndex(next);
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      const prev = Math.max(highlightedIndex - 1, 0);
+      setHighlightedIndex(prev);
+      scrollToIndex(prev);
+      return;
+    }
+
+    // ✅ Only run "type-to-jump" when the input was EMPTY before this key
+    //    (i.e., user is entering the very first character).
+    if (/^[a-z]$/i.test(e.key) && (value ?? "").length === 0) {
+      // Don't preventDefault — we WANT the char to appear in the input.
+      const letter = e.key.toLowerCase();
+
+      const matchIndex = institutions.findIndex((name) => {
+        const ch = (name[0] || "").toLowerCase();
+        return ch === letter;
+      });
+
+      if (matchIndex >= 0) {
+        setHighlightedIndex(matchIndex);
+        scrollToIndex(matchIndex);
+        setOpen(true);
+      }
+    }
+  };
+
+  return (
+    <div className="relative">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)} // user text visible
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+
+      <Popover open={open} onOpenChange={setOpen}>
+        {/* Invisible anchor for positioning */}
+        <PopoverTrigger asChild>
+          <div />
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="p-0 w-[min(560px,90vw)] mt-2"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <div ref={listRef}>
+            <Command shouldFilter={false}>
+              <CommandList className="max-h-64">
+                {loading && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    Loading institutions…
+                  </div>
+                )}
+                {!loading && institutions.length === 0 && (
+                  <CommandEmpty>No approved institutions found.</CommandEmpty>
+                )}
+                {!loading &&
+                  institutions.map((name, i) => (
+                    <CommandItem
+                      key={name}
+                      ref={(el) => (itemRefs.current[i] = el)}
+                      value={name}
+                      onMouseMove={() => setHighlightedIndex(i)}
+                      onSelect={() => {
+                        onChange(name);
+                        setOpen(false);
+                      }}
+                      className={
+                        i === highlightedIndex
+                          ? "bg-accent text-accent-foreground"
+                          : ""
+                      }
+                    >
+                      {name}
+                    </CommandItem>
+                  ))}
+              </CommandList>
+            </Command>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -158,9 +341,8 @@ const Register = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [isReferralCodeLocked, setIsReferralCodeLocked] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
 
-  // Email verification states
+  // Email verification
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [otp, setOtp] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
@@ -176,7 +358,6 @@ const Register = () => {
   useEffect(() => {
     if (user?.email) {
       setFormData((prev) => ({ ...prev, email: user.email }));
-      // Don't auto-verify email - require OTP verification
       setIsEmailVerified(false);
     }
   }, [user]);
@@ -185,15 +366,12 @@ const Register = () => {
   useEffect(() => {
     let interval;
     if (otpTimer > 0) {
-      interval = setInterval(() => {
-        setOtpTimer((prev) => prev - 1);
-      }, 1000);
+      interval = setInterval(() => setOtpTimer((p) => p - 1), 1000);
     }
     return () => clearInterval(interval);
   }, [otpTimer]);
 
   useEffect(() => {
-    // Check for referral code from URL or localStorage
     if (!isReferralCodeLocked) {
       const referralCode = getReferralCode(searchParams);
       if (referralCode) {
@@ -206,23 +384,28 @@ const Register = () => {
     const checkRegistration = async () => {
       if (user?.id) {
         try {
-          const { data: existing } = await supabase
+          // ✅ avoid 406 on no rows
+          const { data: existing, error } = await supabase
             .from("registrations")
             .select("*")
             .eq("user_id", user.id)
-            .single();
+            .maybeSingle();
+
+          if (error) throw error;
+
           if (existing) {
             setAlreadyRegistered(true);
-            // Check if user already has a referral code set
             if (existing.referred_by) {
               setIsReferralCodeLocked(true);
-              // Fetch the referrer's code to display
-              const { data: referrer } = await supabase
+              const { data: referrer, error: refErr } = await supabase
                 .from("registrations")
                 .select("referral_code")
                 .eq("id", existing.referred_by)
-                .single();
-              if (referrer) {
+                .maybeSingle(); // ✅ avoid 406 if id not found
+
+              if (refErr) {
+                console.error("Error fetching referrer:", refErr);
+              } else if (referrer) {
                 setFormData((prev) => ({
                   ...prev,
                   referralCode: referrer.referral_code,
@@ -238,12 +421,10 @@ const Register = () => {
     checkRegistration();
   }, [user]);
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field, value) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
-  };
 
   const validateForm = () => {
-    // Check email verification first
     if (!isEmailVerified) {
       toast({
         title: "Email Verification Required",
@@ -253,7 +434,7 @@ const Register = () => {
       return false;
     }
 
-    const requiredFields = [
+    const required = [
       "fullName",
       "email",
       "phone",
@@ -264,12 +445,11 @@ const Register = () => {
       "country",
       "gender",
     ];
-    if (formData.country === "India") requiredFields.push("state");
-    if (formData.institution === "Others")
-      requiredFields.push("customInstitution");
+    if (formData.country === "India") required.push("state");
+    if (formData.institution === "Others") required.push("customInstitution");
 
-    const missingFields = requiredFields.filter((f) => !formData[f]);
-    if (missingFields.length > 0) {
+    const missing = required.filter((f) => !formData[f]);
+    if (missing.length) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
@@ -278,7 +458,6 @@ const Register = () => {
       return false;
     }
 
-    // ✅ Phone must be exactly 10 digits
     const phoneDigits = (formData.phone || "").replace(/\D/g, "");
     if (phoneDigits.length !== 10) {
       toast({
@@ -328,24 +507,19 @@ const Register = () => {
     try {
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-      // Send OTP via external API
       const apiUrl = `https://quantum.rgukt.in/send_mails/vendor/send_mail.php?to_email=${encodeURIComponent(
         formData.email
       )}&name=${encodeURIComponent(
         formData.fullName || "User"
       )}&otp=${otpCode}`;
-      await fetch(apiUrl, {
-        method: "GET",
-        mode: "no-cors",
-      });
+      await fetch(apiUrl, { method: "GET", mode: "no-cors" });
 
-      // Store OTP temporarily (in production, this should be server-side)
       sessionStorage.setItem("registration_otp", otpCode);
       sessionStorage.setItem("otp_email", formData.email);
       sessionStorage.setItem("otp_timestamp", Date.now().toString());
 
       setIsOtpSent(true);
-      setOtpTimer(60); // 60 seconds countdown
+      setOtpTimer(60);
       toast({
         title: "OTP Sent!",
         description: "Please check your email for the verification code.",
@@ -363,7 +537,6 @@ const Register = () => {
   };
 
   const handleVerifyEmail = async () => {
-    // Clear any previous errors
     setOtpError("");
 
     if (!otp) {
@@ -377,7 +550,6 @@ const Register = () => {
       sessionStorage.getItem("otp_timestamp") || "0"
     );
 
-    // Check if OTP is expired (5 minutes)
     if (Date.now() - otpTimestamp > 5 * 60 * 1000) {
       setOtpError("OTP expired. Please request a new verification code");
       return;
@@ -391,7 +563,6 @@ const Register = () => {
         description: "You can now proceed with registration.",
       });
 
-      // Clean up stored OTP
       sessionStorage.removeItem("registration_otp");
       sessionStorage.removeItem("otp_email");
       sessionStorage.removeItem("otp_timestamp");
@@ -411,25 +582,26 @@ const Register = () => {
 
       const referralCode = await generateUniqueReferralCode();
       let referredBy = null;
+
       if (formData.referralCode) {
-        const { data: referrer } = await supabase
+        const { data: referrer, error: refErr } = await supabase
           .from("registrations")
           .select("id")
           .eq("referral_code", formData.referralCode)
-          .single();
+          .maybeSingle(); // ✅ avoid 406 if not found
+
+        if (refErr) throw refErr;
         if (referrer) referredBy = referrer.id;
       }
 
-      // ✅ Ensure only digits go to DB
       const phoneDigits = sanitizePhone(formData.phone || "");
 
-      // Insert into Supabase
       const { error } = await supabase.from("registrations").insert([
         {
           user_id: user.id,
           fullName: formData.fullName,
           email: formData.email,
-          phone: phoneDigits, // ✅ sanitized
+          phone: phoneDigits,
           gender: formData.gender,
           institution:
             formData.institution === "Others"
@@ -449,22 +621,15 @@ const Register = () => {
 
       if (error) throw error;
 
-      // Send welcome confirmation email via API endpoint
       try {
         const confirmApiUrl = `https://quantum.rgukt.in/send_mails/vendor/confirm_mail.php?to_email=${encodeURIComponent(
           formData.email
         )}&name=${encodeURIComponent(formData.fullName)}`;
-
-        await fetch(confirmApiUrl, {
-          method: "GET",
-          mode: "no-cors", // Handle CORS issues
-        });
+        await fetch(confirmApiUrl, { method: "GET", mode: "no-cors" });
       } catch (emailError) {
         console.error("Error sending confirmation email:", emailError);
-        // Don't fail registration if confirmation email fails
       }
 
-      // Clear stored referral code after successful registration
       clearStoredReferralCode();
 
       setIsSubmitted(true);
@@ -540,13 +705,12 @@ const Register = () => {
   if (alreadyRegistered || isSubmitted) {
     return (
       <motion.div
-        className="min-h-screen flex items-center justify-center bg-background px-4 mt-[90px]"
+        className="min-h-screen flex items-center justify-center bg-background px-4 mt=[90px]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
       >
         <motion.div className="max-w-2xl w-full text-center">
-          {/* Success Animation */}
           <motion.div
             className="relative inline-flex items-center justify-center mb-8"
             initial={{ scale: 0 }}
@@ -578,7 +742,6 @@ const Register = () => {
             </p>
           </motion.div>
 
-          {/* QR Codes Section */}
           <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: 30 }}
@@ -617,7 +780,6 @@ const Register = () => {
             </div>
           </motion.div>
 
-          {/* Action Buttons */}
           <motion.div
             className="flex flex-col sm:flex-row gap-4 justify-center"
             initial={{ opacity: 0, y: 20 }}
@@ -626,12 +788,7 @@ const Register = () => {
           >
             <Button
               onClick={() => window.open(WHATSAPP_GROUP_LINK, "_blank")}
-              className="
-    btn-quantum px-8 py-3 text-base font-semibold rounded-xl
-    shadow-lg group transition-all duration-300 hover:scale-105
-    relative overflow-hidden
-    text-white hover:text-white
-  "
+              className="btn-quantum px-8 py-3 text-base font-semibold rounded-xl shadow-lg group transition-all duration-300 hover:scale-105 relative overflow-hidden text-white hover:text-white"
             >
               <span className="relative z-10 flex items-center">
                 <Users className="h-5 w-5 mr-2" />
@@ -645,12 +802,10 @@ const Register = () => {
               variant="outline"
               className="px-8 py-3 text-base font-semibold rounded-xl border-2 border-quantum-cyan/30 hover:border-quantum-cyan hover:bg-quantum-cyan/10 transition-all duration-300"
             >
-              <Sparkles className="h-4 w-4 mr-2" />
               Refer & Earn Rewards
             </Button>
           </motion.div>
 
-          {/* Additional Info */}
           <motion.div
             className="mt-8 text-sm text-muted-foreground"
             initial={{ opacity: 0 }}
@@ -658,40 +813,12 @@ const Register = () => {
             transition={{ delay: 1, duration: 0.6 }}
           >
             <p>🎯 Next step: Check your email for confirmation details</p>
-            <p>
-              📱 Join our community to get real-time updates and connect with
-              other participants
-            </p>
+            <p>📱 Join our community to get real-time updates</p>
           </motion.div>
         </motion.div>
       </motion.div>
     );
   }
-
-  // Form sections for better organization
-  const formSections = [
-    {
-      id: 1,
-      title: "Personal Information",
-      icon: User,
-      description: "Basic details about you",
-      fields: ["fullName", "email", "phone", "gender", "country", "state"],
-    },
-    {
-      id: 2,
-      title: "Academic Details",
-      icon: GraduationCap,
-      description: "Your educational background",
-      fields: ["institution", "year", "branch", "attendanceMode"],
-    },
-    {
-      id: 3,
-      title: "Experience & Goals",
-      icon: BookOpen,
-      description: "Your quantum journey",
-      fields: ["experience", "motivation", "referralCode"],
-    },
-  ];
 
   return (
     <motion.div
@@ -702,7 +829,6 @@ const Register = () => {
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div className="max-w-4xl mx-auto">
-          {/* Enhanced Registration Card */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -711,6 +837,7 @@ const Register = () => {
             <Card className="glass-card border border-white/20 shadow-lg relative overflow-hidden">
               <CardContent className="p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Personal Info */}
                   <motion.div
                     className="space-y-4"
                     initial={{ opacity: 0, y: 20 }}
@@ -758,7 +885,7 @@ const Register = () => {
                             id="email"
                             value={formData.email}
                             placeholder="Email from your account"
-                            disabled={true}
+                            disabled
                             className="bg-muted cursor-not-allowed text-muted-foreground"
                             required
                           />
@@ -788,7 +915,7 @@ const Register = () => {
                                       value={otp}
                                       onChange={(e) => {
                                         setOtp(e.target.value);
-                                        if (otpError) setOtpError(""); // Clear error when user starts typing
+                                        if (otpError) setOtpError("");
                                       }}
                                       placeholder="Enter 6-digit OTP"
                                       maxLength={6}
@@ -828,7 +955,7 @@ const Register = () => {
                       </motion.div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md-grid-cols-2 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="phone" className="text-sm font-medium">
                           Phone Number *
@@ -843,21 +970,19 @@ const Register = () => {
                             )
                           }
                           onKeyDown={(e) => {
-                            // Block space key from soft keyboards
                             if (e.key === " ") e.preventDefault();
                           }}
                           onPaste={(e) => {
-                            // Clean pasted content
                             e.preventDefault();
                             const pasted = (
                               e.clipboardData || window.clipboardData
                             ).getData("text");
                             handleInputChange("phone", sanitizePhone(pasted));
                           }}
-                          inputMode="numeric" // nudges mobile keyboards to numeric
-                          type="tel" // phone-friendly, still flexible
-                          pattern="\d{10}" // HTML validation: exactly 10 digits
-                          maxLength={10} // hard cap in the UI
+                          inputMode="numeric"
+                          type="tel"
+                          pattern="\d{10}"
+                          maxLength={10}
                           autoComplete="tel"
                           placeholder="10-digit number"
                           required
@@ -945,6 +1070,7 @@ const Register = () => {
                     </div>
                   </motion.div>
 
+                  {/* Academic Details */}
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -958,9 +1084,8 @@ const Register = () => {
                           value={formData.institution}
                           onValueChange={(value) => {
                             handleInputChange("institution", value);
-                            if (value !== "Others") {
+                            if (value !== "Others")
                               handleInputChange("customInstitution", "");
-                            }
                           }}
                         >
                           <SelectTrigger>
@@ -974,19 +1099,16 @@ const Register = () => {
                             ))}
                           </SelectContent>
                         </Select>
+
+                        {/* When "Others", show the free-text + suggestions input */}
                         {formData.institution === "Others" && (
                           <div className="mt-2">
-                            <Input
-                              id="customInstitution"
+                            <ApprovedInstitutionInput
                               value={formData.customInstitution}
-                              onChange={(e) =>
-                                handleInputChange(
-                                  "customInstitution",
-                                  e.target.value
-                                )
+                              onChange={(v) =>
+                                handleInputChange("customInstitution", v)
                               }
-                              placeholder="Enter your institution name"
-                              required
+                              placeholder="Enter your institution"
                             />
                           </div>
                         )}
@@ -1062,6 +1184,7 @@ const Register = () => {
                     </div>
                   </div>
 
+                  {/* Experience & Goals */}
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label
@@ -1146,13 +1269,14 @@ const Register = () => {
                     </div>
                   </div>
 
+                  {/* Terms & Submit */}
                   <div className="space-y-3 pt-6 border-t border-border/30">
                     <div className="flex items-start space-x-3">
                       <Checkbox
                         id="agreeTerms"
                         checked={formData.agreeTerms}
                         onCheckedChange={(checked) =>
-                          handleInputChange("agreeTerms", checked)
+                          handleInputChange("agreeTerms", !!checked)
                         }
                         className="mt-1"
                       />
@@ -1171,7 +1295,7 @@ const Register = () => {
                         id="agreeUpdates"
                         checked={formData.agreeUpdates}
                         onCheckedChange={(checked) =>
-                          handleInputChange("agreeUpdates", checked)
+                          handleInputChange("agreeUpdates", !!checked)
                         }
                         className="mt-1"
                       />
@@ -1219,19 +1343,9 @@ const Register = () => {
                         onClick={() =>
                           window.open(WHATSAPP_GROUP_LINK, "_blank")
                         }
-                        className="
-    group relative isolate overflow-hidden
-    px-8 py-3 text-base font-semibold rounded-xl
-    shadow-lg transition-all duration-300 hover:scale-105
-    bg-[#0F131A] text-white
-  "
+                        className="group relative isolate overflow-hidden px-8 py-3 text-base font-semibold rounded-xl shadow-lg transition-all duration-300 hover:scale-105 bg-[#0F131A] text-white"
                       >
-                        {/* gradient background layer */}
-                        <span
-                          className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity
-                   bg-gradient-to-r from-quantum-blue to-quantum-purple"
-                        />
-                        {/* content stays above */}
+                        <span className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-quantum-blue to-quantum-purple" />
                         <span className="relative z-10 flex items-center">
                           <Users className="h-5 w-5 mr-2" />
                           Join WhatsApp Community
