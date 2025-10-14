@@ -29,7 +29,7 @@ const NotFound = () => {
       transition={{ duration: 0.5 }}
       className="min-h-screen bg-background flex items-center justify-center px-4"
     >
-      <div className="max-w-2xl w-full text-center">
+      <div className="max-w-2xl w-full text-center pt-28 md:pt-32">
         {/* 404 Animation */}
         <motion.div
           className="mb-8"
