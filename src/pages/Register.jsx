@@ -151,7 +151,6 @@ function ApprovedInstitutionInput({
 
   const itemRefs = useRef([]);
   const listRef = useRef(null);
-  const inputRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -192,19 +191,6 @@ function ApprovedInstitutionInput({
     };
   }, [toast]);
 
-  const handleFocus = () => {
-    setOpen(true);
-    const idx = value
-      ? institutions.findIndex((n) => n.toLowerCase() === value.toLowerCase())
-      : -1;
-    setHighlightedIndex(idx);
-  };
-
-  const handleBlur = () => {
-    // Delay closing so click/enter can register
-    setTimeout(() => setOpen(false), 120);
-  };
-
   const scrollToIndex = (i) => {
     const el = itemRefs.current[i];
     if (el?.scrollIntoView) el.scrollIntoView({ block: "nearest" });
@@ -238,7 +224,6 @@ function ApprovedInstitutionInput({
     // ✅ Only run "type-to-jump" when the input was EMPTY before this key
     //    (i.e., user is entering the very first character).
     if (/^[a-z]$/i.test(e.key) && (value ?? "").length === 0) {
-      // Don't preventDefault — we WANT the char to appear in the input.
       const letter = e.key.toLowerCase();
 
       const matchIndex = institutions.findIndex((name) => {
@@ -255,65 +240,73 @@ function ApprovedInstitutionInput({
   };
 
   return (
-    <div className="relative">
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)} // user text visible
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={onKeyDown}
-        placeholder={placeholder}
-        disabled={disabled}
-      />
+    <Popover open={open} onOpenChange={setOpen}>
+      {/* Use the INPUT itself as the trigger so content is anchored correctly and never hides the field */}
+      <PopoverTrigger asChild>
+        <div className="w-full">
+          <Input
+            value={value}
+            onChange={(e) => onChange(e.target.value)} // user text stays visible
+            onFocus={() => {
+              setOpen(true);
+              const idx = value
+                ? institutions.findIndex(
+                    (n) => n.toLowerCase() === value.toLowerCase()
+                  )
+                : -1;
+              setHighlightedIndex(idx);
+            }}
+            onKeyDown={onKeyDown}
+            placeholder={placeholder}
+            disabled={disabled}
+          />
+        </div>
+      </PopoverTrigger>
 
-      <Popover open={open} onOpenChange={setOpen}>
-        {/* Invisible anchor for positioning */}
-        <PopoverTrigger asChild>
-          <div />
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="p-0 w-[min(560px,90vw)] mt-2"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <div ref={listRef}>
-            <Command shouldFilter={false}>
-              <CommandList className="max-h-64">
-                {loading && (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    Loading institutions…
-                  </div>
-                )}
-                {!loading && institutions.length === 0 && (
-                  <CommandEmpty>No approved institutions found.</CommandEmpty>
-                )}
-                {!loading &&
-                  institutions.map((name, i) => (
-                    <CommandItem
-                      key={name}
-                      ref={(el) => (itemRefs.current[i] = el)}
-                      value={name}
-                      onMouseMove={() => setHighlightedIndex(i)}
-                      onSelect={() => {
-                        onChange(name);
-                        setOpen(false);
-                      }}
-                      className={
-                        i === highlightedIndex
-                          ? "bg-accent text-accent-foreground"
-                          : ""
-                      }
-                    >
-                      {name}
-                    </CommandItem>
-                  ))}
-              </CommandList>
-            </Command>
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={8}
+        avoidCollisions={false}
+        className="p-0 z-50 w-[--radix-popover-trigger-width] shadow-lg"
+        onOpenAutoFocus={(e) => e.preventDefault()} // keep focus on input
+      >
+        <div ref={listRef}>
+          <Command shouldFilter={false}>
+            <CommandList className="max-h-64">
+              {loading && (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  Loading institutions…
+                </div>
+              )}
+              {!loading && institutions.length === 0 && (
+                <CommandEmpty>No approved institutions found.</CommandEmpty>
+              )}
+              {!loading &&
+                institutions.map((name, i) => (
+                  <CommandItem
+                    key={name}
+                    ref={(el) => (itemRefs.current[i] = el)}
+                    value={name}
+                    onMouseMove={() => setHighlightedIndex(i)}
+                    onSelect={() => {
+                      onChange(name);
+                      setOpen(false);
+                    }}
+                    className={
+                      i === highlightedIndex
+                        ? "bg-accent text-accent-foreground"
+                        : ""
+                    }
+                  >
+                    {name}
+                  </CommandItem>
+                ))}
+            </CommandList>
+          </Command>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
