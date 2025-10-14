@@ -62,10 +62,9 @@ const Speakers = () => {
                         ) : (
                           <div className="w-32 h-32 bg-primary/20 rounded-full flex items-center justify-center">
                             <span className="text-3xl font-bold text-primary">
-                              {speaker.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
+                              {speaker.name && speaker.name.trim().length > 0
+                                ? speaker.name.trim().charAt(0).toUpperCase()
+                                : "?"}
                             </span>
                           </div>
                         )}
@@ -152,10 +151,9 @@ const Speakers = () => {
                       <div className="flex items-start space-x-4">
                         <div className="flex-shrink-0 w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
                           <span className="text-2xl font-bold text-primary">
-                            {speaker.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
+                            {speaker.name && speaker.name.trim().length > 0
+                              ? speaker.name.trim().charAt(0).toUpperCase()
+                              : "?"}
                           </span>
                         </div>
                         <div className="flex-1">
