@@ -43,6 +43,8 @@ import {
 import groupQR from "/images/group-7.png";
 import secondQR from "/images/second-qr.jpg";
 
+const sampleVariable = "sampleVariable";
+
 // ✅ WhatsApp link
 const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/GHPDWA3KNuN9ChUfiy5ZcE";
 
