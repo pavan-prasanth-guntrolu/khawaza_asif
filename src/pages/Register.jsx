@@ -40,12 +40,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import groupQR from "/images/group-5.png";
+import groupQR from "/images/group-7.png";
 import secondQR from "/images/second-qr.jpg";
 
 // ✅ WhatsApp link
-const WHATSAPP_GROUP_LINK =
-  "https://chat.whatsapp.com/Hfp1EMXswmr4OpnHj7dZpZ?mode=wwc";
+const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/GHPDWA3KNuN9ChUfiy5ZcE";
 
 // ✅ All countries list
 const countries = [

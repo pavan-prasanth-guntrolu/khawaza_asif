@@ -159,7 +159,7 @@ const Schedule = () => {
         {scheduleData.conference.days.map((day) => (
           <div key={day.date} className="mb-16">
             <h2 className="text-3xl font-semibold mb-2 text-center text-purple-300">
-              {day.date} ({day.day}) – {day.title}
+              {day.date} ({day.day}) {day.title}
             </h2>
             <p className="text-center text-slate-400 italic mb-8">
               {day.theme}
