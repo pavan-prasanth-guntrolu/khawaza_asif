@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -40,12 +40,12 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import groupQR from "/images/group-4.jpg";
+import groupQR from "/images/group-5.png";
 import secondQR from "/images/second-qr.jpg";
 
 // ✅ WhatsApp link
 const WHATSAPP_GROUP_LINK =
-  "https://chat.whatsapp.com/CQGYsUS07JEAwyfIzGG9Eg?mode=ems_qr_t";
+  "https://chat.whatsapp.com/Hfp1EMXswmr4OpnHj7dZpZ?mode=wwc";
 
 // ✅ All countries list
 const countries = [
@@ -137,6 +137,7 @@ const sanitizePhone = (value) => value.replace(/\D/g, "").slice(0, 10);
 const normalize = (s = "") => s.trim().replace(/\s+/g, " ");
 
 // --- Free-text input with suggestions; type-to-jump only on the FIRST typed character ---
+// Dropdown hides automatically when no college matches the typed text.
 function ApprovedInstitutionInput({
   value,
   onChange,
@@ -148,6 +149,7 @@ function ApprovedInstitutionInput({
   const [loading, setLoading] = useState(false);
   const [institutions, setInstitutions] = useState([]); // flat, sorted list
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [focused, setFocused] = useState(false);
 
   const itemRefs = useRef([]);
   const listRef = useRef(null);
@@ -191,6 +193,28 @@ function ApprovedInstitutionInput({
     };
   }, [toast]);
 
+  // Filter by user text; if empty, show full list
+  const filtered = useMemo(() => {
+    const q = (value || "").toLowerCase();
+    if (!q) return institutions;
+    return institutions.filter((n) => n.toLowerCase().includes(q));
+  }, [value, institutions]);
+
+  // Open/close based on filtered results and focus state
+  useEffect(() => {
+    if (!focused) return;
+    if (filtered.length === 0) {
+      setOpen(false);
+      setHighlightedIndex(-1);
+    } else {
+      setOpen(true);
+      if (highlightedIndex < 0 || highlightedIndex >= filtered.length) {
+        setHighlightedIndex(0);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered.length, focused]);
+
   const scrollToIndex = (i) => {
     const el = itemRefs.current[i];
     if (el?.scrollIntoView) el.scrollIntoView({ block: "nearest" });
@@ -198,63 +222,75 @@ function ApprovedInstitutionInput({
 
   const onKeyDown = (e) => {
     if (e.key === "Enter") {
-      if (highlightedIndex >= 0 && highlightedIndex < institutions.length) {
-        onChange(institutions[highlightedIndex]); // pick highlighted
+      if (highlightedIndex >= 0 && highlightedIndex < filtered.length) {
+        onChange(filtered[highlightedIndex]); // pick highlighted from filtered list
         setOpen(false);
       }
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (!open) setOpen(true);
-      const next = Math.min(highlightedIndex + 1, institutions.length - 1);
-      setHighlightedIndex(next);
-      scrollToIndex(next);
+      if (!open && filtered.length > 0) setOpen(true);
+      if (filtered.length > 0) {
+        const next = Math.min(highlightedIndex + 1, filtered.length - 1);
+        setHighlightedIndex(next);
+        scrollToIndex(next);
+      }
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      if (!open) setOpen(true);
-      const prev = Math.max(highlightedIndex - 1, 0);
-      setHighlightedIndex(prev);
-      scrollToIndex(prev);
+      if (!open && filtered.length > 0) setOpen(true);
+      if (filtered.length > 0) {
+        const prev = Math.max(highlightedIndex - 1, 0);
+        setHighlightedIndex(prev);
+        scrollToIndex(prev);
+      }
       return;
     }
 
-    // ✅ Only run "type-to-jump" when the input was EMPTY before this key
-    //    (i.e., user is entering the very first character).
+    // ✅ Type-to-jump only when input was EMPTY before this key (use the full list)
     if (/^[a-z]$/i.test(e.key) && (value ?? "").length === 0) {
       const letter = e.key.toLowerCase();
-
-      const matchIndex = institutions.findIndex((name) => {
-        const ch = (name[0] || "").toLowerCase();
-        return ch === letter;
-      });
-
+      const matchIndex = institutions.findIndex(
+        (name) => (name[0] || "").toLowerCase() === letter
+      );
       if (matchIndex >= 0) {
+        // Find corresponding index in filtered view (which equals full list when value is empty)
         setHighlightedIndex(matchIndex);
         scrollToIndex(matchIndex);
-        setOpen(true);
+        if (focused) setOpen(true);
       }
     }
   };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      {/* Use the INPUT itself as the trigger so content is anchored correctly and never hides the field */}
       <PopoverTrigger asChild>
         <div className="w-full">
           <Input
             value={value}
             onChange={(e) => onChange(e.target.value)} // user text stays visible
             onFocus={() => {
-              setOpen(true);
+              setFocused(true);
+              // open only if there are matches
+              setOpen((filtered.length ?? 0) > 0);
+              // highlight current exact match if any
               const idx = value
-                ? institutions.findIndex(
+                ? filtered.findIndex(
                     (n) => n.toLowerCase() === value.toLowerCase()
                   )
+                : filtered.length
+                ? 0
                 : -1;
               setHighlightedIndex(idx);
+            }}
+            onBlur={() => {
+              // close after a tiny delay to allow click
+              setTimeout(() => {
+                setOpen(false);
+                setFocused(false);
+              }, 120);
             }}
             onKeyDown={onKeyDown}
             placeholder={placeholder}
@@ -279,11 +315,11 @@ function ApprovedInstitutionInput({
                   Loading institutions…
                 </div>
               )}
-              {!loading && institutions.length === 0 && (
-                <CommandEmpty>No approved institutions found.</CommandEmpty>
+              {!loading && filtered.length === 0 && (
+                <CommandEmpty /> /* hidden state; popover already closes when filtered is 0 */
               )}
               {!loading &&
-                institutions.map((name, i) => (
+                filtered.map((name, i) => (
                   <CommandItem
                     key={name}
                     ref={(el) => (itemRefs.current[i] = el)}
@@ -377,7 +413,6 @@ const Register = () => {
     const checkRegistration = async () => {
       if (user?.id) {
         try {
-          // ✅ avoid 406 on no rows
           const { data: existing, error } = await supabase
             .from("registrations")
             .select("*")
@@ -394,7 +429,7 @@ const Register = () => {
                 .from("registrations")
                 .select("referral_code")
                 .eq("id", existing.referred_by)
-                .maybeSingle(); // ✅ avoid 406 if id not found
+                .maybeSingle();
 
               if (refErr) {
                 console.error("Error fetching referrer:", refErr);
@@ -581,7 +616,7 @@ const Register = () => {
           .from("registrations")
           .select("id")
           .eq("referral_code", formData.referralCode)
-          .maybeSingle(); // ✅ avoid 406 if not found
+          .maybeSingle();
 
         if (refErr) throw refErr;
         if (referrer) referredBy = referrer.id;
@@ -698,7 +733,7 @@ const Register = () => {
   if (alreadyRegistered || isSubmitted) {
     return (
       <motion.div
-        className="min-h-screen flex items-center justify-center bg-background px-4 mt=[90px]"
+        className="min-h-screen flex items-center justify-center bg-background px-4 mt-[90px]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
@@ -1103,6 +1138,10 @@ const Register = () => {
                               }
                               placeholder="Enter your institution"
                             />
+                            <p className="text-xs text-muted-foreground ]">
+                              If your college name is not here, please enter
+                              your college name and proceed.
+                            </p>
                           </div>
                         )}
                       </div>
